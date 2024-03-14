@@ -56,7 +56,7 @@ def deploy(args, model, model_params, prefix):
 
     img, scale, T = process_img(img_in, model_params.img_ppi, img_c)
 
-    main_dev = torch.device(f"cuda:{model_params.gpus[0]}")
+    main_dev = torch.device("cpu")
     with torch.no_grad():
         output = model.module.get_prediction(torch.from_numpy(img).float()[None, None].to(main_dev))
 
@@ -85,13 +85,15 @@ def deploy(args, model, model_params, prefix):
     uni_io.imwrite(seg_file, seg[: img_ori.shape[0], : img_ori.shape[1]] * 255)
 
 
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--gpus", "-g", default=[2], type=int, nargs="+")
-    parser.add_argument("--img-name", "-i", default="1_1.tif", type=str, help="input image name")
+    parser.add_argument("--input-folder", "-f", default="input_folder", type=str, help="input folder containing images")
     args = parser.parse_args()
 
-    prefix = "image"
+    input_folder = args.input_folder
 
     # this is the trained model parameters for plain fingerprints, trained models for rolled and
     # latent fingerprints are coming soon...
@@ -122,8 +124,13 @@ if __name__ == "__main__":
     name_lst.sort()
     load_model(i2p_model, name_lst[-1])
     i2p_model = nn.DataParallel(i2p_model, device_ids=i2p_params.gpus)
-    main_dev = torch.device(f"cuda:{i2p_params.gpus[0]}")
+    main_dev = torch.device("cpu")
     i2p_model.to(main_dev)
     i2p_model.eval()
 
-    deploy(args, i2p_model, i2p_params, prefix)
+    image_files = glob(osp.join(input_folder, "*.png"))
+
+    for image_file in image_files:
+        args.img_name = osp.basename(image_file)
+        deploy(args, i2p_model, i2p_params, input_folder)
+
